@@ -38,16 +38,35 @@ const PdfReader = ({
   const [isBookmarked, setIsBookmarked] = useState(book.isBookmarked || false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfDocumentRef = useRef<any>(null);
-  const fileDataRef = useRef<ArrayBuffer>(book.file);
+  
+  // Store the file data directly, don't use a ref
+  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
+
+  // Load the book file when component mounts
+  useEffect(() => {
+    // Clone the ArrayBuffer to prevent issues with "neutered" ArrayBuffers
+    if (book.file instanceof ArrayBuffer) {
+      // Create a new Uint8Array from the existing ArrayBuffer to copy the data
+      const fileBytes = new Uint8Array(book.file);
+      const newBuffer = new ArrayBuffer(fileBytes.byteLength);
+      const newBytes = new Uint8Array(newBuffer);
+      newBytes.set(fileBytes);
+      setPdfData(newBuffer);
+    } else {
+      console.error("Book file is not an ArrayBuffer");
+      toast.error("Invalid PDF file format");
+    }
+  }, [book.file]);
 
   useEffect(() => {
     let isMounted = true;
+    
+    // Only proceed if we have valid PDF data
+    if (!pdfData) return;
+    
     const loadPdf = async () => {
       try {
         setIsLoading(true);
-        
-        // Make sure we're using a fresh copy of the ArrayBuffer
-        const pdfData = fileDataRef.current;
         
         // Load PDF.js dynamically
         const pdfjsLib = await import("pdfjs-dist");
@@ -57,7 +76,7 @@ const PdfReader = ({
           pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
         }
         
-        // Load document
+        // Load document with the copied ArrayBuffer
         const PDFJS = await pdfjsLib.getDocument({ data: pdfData }).promise;
         
         if (pdfDocumentRef.current) {
@@ -88,7 +107,7 @@ const PdfReader = ({
         pdfDocumentRef.current.destroy().catch(console.error);
       }
     };
-  }, []);
+  }, [pdfData, currentPage]); // Re-run when pdfData changes
 
   useEffect(() => {
     renderPage(currentPage);
@@ -130,6 +149,19 @@ const PdfReader = ({
     setIsBookmarked(!isBookmarked);
     onBookmarkToggle(book.id);
   };
+
+  // Early return if no PDF data
+  if (!pdfData) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center">
+        <div className="text-center p-8">
+          <h3 className="text-lg font-medium mb-2">Unable to load PDF</h3>
+          <p className="text-muted-foreground mb-4">The PDF file could not be loaded correctly.</p>
+          <Button onClick={onClose}>Return to Library</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">

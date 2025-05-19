@@ -97,6 +97,8 @@ export async function renderPdfPage({
       context!.filter = theme === "dark" 
         ? "invert(1) hue-rotate(180deg)"
         : "sepia(0.5) brightness(0.95)";
+    } else {
+      context!.filter = "none"; // Reset filter for light theme
     }
     
     const renderContext = {
