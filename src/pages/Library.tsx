@@ -2,14 +2,12 @@
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { BookType } from "@/types/book";
-import DashboardStats from "@/components/DashboardStats";
-import RecentBooks from "@/components/RecentBooks";
+import BookGrid from "@/components/BookGrid";
 import BookUploader from "@/components/BookUploader";
 import PdfReader from "@/components/PdfReader";
-import { loadBooks, saveBooks, updateBook } from "@/lib/storage";
-import { toast } from "sonner";
+import { loadBooks, saveBooks } from "@/lib/storage";
 
-const Index = () => {
+const Library = () => {
   const [books, setBooks] = useState<BookType[]>([]);
   const [currentBook, setCurrentBook] = useState<BookType | null>(null);
   
@@ -31,11 +29,7 @@ const Index = () => {
   const handleBookmarkToggle = (bookId: string) => {
     const updatedBooks = books.map((book) => {
       if (book.id === bookId) {
-        const isBookmarked = !book.isBookmarked;
-        toast.success(
-          isBookmarked ? "Book bookmarked" : "Bookmark removed"
-        );
-        return { ...book, isBookmarked };
+        return { ...book, isBookmarked: !book.isBookmarked };
       }
       return book;
     });
@@ -72,7 +66,7 @@ const Index = () => {
       });
     }
   };
-
+  
   if (currentBook) {
     return (
       <PdfReader
@@ -87,26 +81,40 @@ const Index = () => {
   return (
     <Layout>
       <div className="space-y-8">
-        <h1 className="text-3xl font-bold text-center sm:text-left">Welcome to Your Reading Hub</h1>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h1 className="text-3xl font-bold">Your Library</h1>
+        </div>
         
-        <DashboardStats books={books} />
-        
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <RecentBooks 
-              books={books} 
-              onBookSelect={handleBookSelect} 
-              maxItems={10}
-            />
-          </div>
-          
-          <div>
+        {books.length === 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+            <div className="space-y-4">
+              <h2 className="text-xl font-medium">Welcome to your library</h2>
+              <p className="text-muted-foreground">
+                Your personal collection for all your PDF books. Upload your first PDF
+                to get started with your reading journey.
+              </p>
+              <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                <li>Upload any PDF file</li>
+                <li>Read it with our built-in reader</li>
+                <li>Track your reading progress</li>
+                <li>Bookmark your favorite books</li>
+              </ul>
+            </div>
             <BookUploader onBookAdded={handleBookAdded} />
           </div>
-        </div>
+        ) : (
+          <>
+            <BookGrid books={books} onBookSelect={handleBookSelect} />
+            
+            <div className="pt-8">
+              <h2 className="text-xl font-medium mb-4">Add More Books</h2>
+              <BookUploader onBookAdded={handleBookAdded} />
+            </div>
+          </>
+        )}
       </div>
     </Layout>
   );
 };
 
-export default Index;
+export default Library;
