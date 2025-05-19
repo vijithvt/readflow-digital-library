@@ -38,12 +38,18 @@ const PdfReader = ({
   const [isBookmarked, setIsBookmarked] = useState(book.isBookmarked || false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfDocumentRef = useRef<any>(null);
+  const fileDataRef = useRef<ArrayBuffer>(book.file);
 
   useEffect(() => {
     let isMounted = true;
     const loadPdf = async () => {
       try {
         setIsLoading(true);
+        
+        // Make sure we're using a fresh copy of the ArrayBuffer
+        const pdfData = fileDataRef.current;
+        
+        // Load PDF.js dynamically
         const pdfjsLib = await import("pdfjs-dist");
         
         // Set worker source to CDN
@@ -52,16 +58,25 @@ const PdfReader = ({
         }
         
         // Load document
-        const PDFJS = await pdfjsLib.getDocument({ data: book.file }).promise;
+        const PDFJS = await pdfjsLib.getDocument({ data: pdfData }).promise;
+        
+        if (pdfDocumentRef.current) {
+          await pdfDocumentRef.current.destroy().catch(console.error);
+        }
+        
         pdfDocumentRef.current = PDFJS;
         
         if (isMounted) {
           setTotalPages(PDFJS.numPages);
-          renderPage(currentPage);
+          await renderPage(currentPage);
         }
       } catch (error) {
         console.error("Error loading PDF:", error);
         toast.error("Failed to load PDF");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -73,7 +88,7 @@ const PdfReader = ({
         pdfDocumentRef.current.destroy().catch(console.error);
       }
     };
-  }, [book.file]);
+  }, []);
 
   useEffect(() => {
     renderPage(currentPage);

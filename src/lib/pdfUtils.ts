@@ -12,24 +12,23 @@ type PdfMetadata = {
 export async function extractPdfMetadata(
   fileData: ArrayBuffer
 ): Promise<PdfMetadata> {
-  const { getDocument } = await import("pdfjs-dist");
-  
   try {
     // Load PDF.js dynamically
     const pdfjsLib = await import("pdfjs-dist");
     
     // Set worker source - this approach doesn't directly import the worker file
     if (typeof window !== 'undefined') {
-      // Use CDN worker or set it to null for automatic worker loading
+      // Use CDN worker for better compatibility
       pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
     }
     
-    const loadingTask = getDocument({ data: fileData });
+    const loadingTask = pdfjsLib.getDocument({ data: fileData });
     const pdfDocument = await loadingTask.promise;
     
+    // Handle potential empty metadata safely
     const metadataResult = await pdfDocument.getMetadata().catch(() => ({}));
-    // Handle the case where metadata might be empty
-    const info = metadataResult.info || {};
+    // Safely access info with optional chaining
+    const info = metadataResult?.info || {};
     
     // Try to extract cover image from first page
     let coverUrl = "/placeholder.svg";
@@ -42,7 +41,7 @@ export async function extractPdfMetadata(
       canvas.height = viewport.height;
       
       const renderContext = {
-        canvasContext: canvas.getContext("2d"),
+        canvasContext: canvas.getContext("2d")!,
         viewport: viewport,
       };
       
