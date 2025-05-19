@@ -27,8 +27,9 @@ export async function extractPdfMetadata(
     
     // Handle potential empty metadata safely
     const metadataResult = await pdfDocument.getMetadata().catch(() => ({}));
-    // Safely access info with optional chaining
-    const info = metadataResult?.info || {};
+    
+    // Use type assertion to help TypeScript understand the structure
+    const info = (metadataResult as any)?.info || {};
     
     // Try to extract cover image from first page
     let coverUrl = "/placeholder.svg";
