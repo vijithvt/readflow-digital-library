@@ -27,9 +27,9 @@ export async function extractPdfMetadata(
     const loadingTask = getDocument({ data: fileData });
     const pdfDocument = await loadingTask.promise;
     
-    const metadata = await pdfDocument.getMetadata().catch(() => ({}));
+    const metadataResult = await pdfDocument.getMetadata().catch(() => ({}));
     // Handle the case where metadata might be empty
-    const info = metadata.info || {};
+    const info = metadataResult.info || {};
     
     // Try to extract cover image from first page
     let coverUrl = "/placeholder.svg";

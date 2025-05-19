@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { BookType } from "@/types/book";
 import { extractPdfMetadata } from "@/lib/pdfUtils";
+import { BookOpen } from "lucide-react"; // Added missing import
 
 type BookUploaderProps = {
   onBookAdded: (book: BookType) => void;
