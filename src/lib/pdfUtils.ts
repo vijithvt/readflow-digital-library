@@ -15,17 +15,20 @@ export async function extractPdfMetadata(
   const { getDocument } = await import("pdfjs-dist");
   
   try {
-    // Setup worker
-    const pdfjsWorker = await import("pdfjs-dist/build/pdf.worker.mjs");
-    if (typeof window !== 'undefined' && 'pdfjsWorker' in window === false) {
-      // @ts-ignore
-      window.pdfjsWorker = pdfjsWorker;
+    // Load PDF.js dynamically
+    const pdfjsLib = await import("pdfjs-dist");
+    
+    // Set worker source - this approach doesn't directly import the worker file
+    if (typeof window !== 'undefined') {
+      // Use CDN worker or set it to null for automatic worker loading
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
     }
     
     const loadingTask = getDocument({ data: fileData });
     const pdfDocument = await loadingTask.promise;
     
     const metadata = await pdfDocument.getMetadata().catch(() => ({}));
+    // Handle the case where metadata might be empty
     const info = metadata.info || {};
     
     // Try to extract cover image from first page

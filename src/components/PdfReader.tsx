@@ -44,17 +44,15 @@ const PdfReader = ({
     const loadPdf = async () => {
       try {
         setIsLoading(true);
-        const { getDocument } = await import("pdfjs-dist");
+        const pdfjsLib = await import("pdfjs-dist");
         
-        // Setup worker
-        const pdfjsWorker = await import("pdfjs-dist/build/pdf.worker.mjs");
-        if (typeof window !== 'undefined' && 'pdfjsWorker' in window === false) {
-          // @ts-ignore
-          window.pdfjsWorker = pdfjsWorker;
+        // Set worker source to CDN
+        if (typeof window !== 'undefined') {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
         }
         
-        // Set worker
-        const PDFJS = await getDocument({ data: book.file }).promise;
+        // Load document
+        const PDFJS = await pdfjsLib.getDocument({ data: book.file }).promise;
         pdfDocumentRef.current = PDFJS;
         
         if (isMounted) {
