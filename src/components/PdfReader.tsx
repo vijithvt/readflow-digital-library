@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "./ThemeProvider";
 import { BookType } from "@/types/book";
@@ -12,7 +11,12 @@ import {
   BookmarkIcon,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 import { renderPdfPage } from "@/lib/pdfUtils";
 import { toast } from "sonner";
@@ -38,15 +42,10 @@ const PdfReader = ({
   const [isBookmarked, setIsBookmarked] = useState(book.isBookmarked || false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfDocumentRef = useRef<any>(null);
-  
-  // Store the file data directly, don't use a ref
   const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
 
-  // Load the book file when component mounts
   useEffect(() => {
-    // Clone the ArrayBuffer to prevent issues with "neutered" ArrayBuffers
     if (book.file instanceof ArrayBuffer) {
-      // Create a new Uint8Array from the existing ArrayBuffer to copy the data
       const fileBytes = new Uint8Array(book.file);
       const newBuffer = new ArrayBuffer(fileBytes.byteLength);
       const newBytes = new Uint8Array(newBuffer);
@@ -58,33 +57,44 @@ const PdfReader = ({
     }
   }, [book.file]);
 
+  const renderPage = async (pageNum: number) => {
+    if (!pdfDocumentRef.current || !canvasRef.current) return;
+    try {
+      await renderPdfPage(
+        pdfDocumentRef.current,
+        canvasRef.current,
+        pageNum,
+        zoom,
+        theme
+      );
+    } catch (err) {
+      console.error("Error rendering page:", err);
+      toast.error("Failed to render page");
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
-    
-    // Only proceed if we have valid PDF data
+
     if (!pdfData) return;
-    
+
     const loadPdf = async () => {
       try {
         setIsLoading(true);
-        
-        // Load PDF.js dynamically
         const pdfjsLib = await import("pdfjs-dist");
-        
-        // Set worker source to CDN
-        if (typeof window !== 'undefined') {
+
+        if (typeof window !== "undefined") {
           pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
         }
-        
-        // Load document with the copied ArrayBuffer
+
         const PDFJS = await pdfjsLib.getDocument({ data: pdfData }).promise;
-        
+
         if (pdfDocumentRef.current) {
           await pdfDocumentRef.current.destroy().catch(console.error);
         }
-        
+
         pdfDocumentRef.current = PDFJS;
-        
+
         if (isMounted) {
           setTotalPages(PDFJS.numPages);
           await renderPage(currentPage);
@@ -107,177 +117,107 @@ const PdfReader = ({
         pdfDocumentRef.current.destroy().catch(console.error);
       }
     };
-  }, [pdfData, currentPage]); // Re-run when pdfData changes
+  }, [pdfData]);
 
   useEffect(() => {
-    renderPage(currentPage);
-  }, [currentPage, zoom, theme]);
-
-  const renderPage = async (pageNumber: number) => {
-    if (!pdfDocumentRef.current || !canvasRef.current) return;
-    
-    try {
-      setIsLoading(true);
-      
-      await renderPdfPage({
-        pdfDocument: pdfDocumentRef.current,
-        pageNumber,
-        canvas: canvasRef.current,
-        scale: zoom,
-        theme,
-      });
-      
-      onUpdateProgress(book.id, pageNumber);
-      setIsLoading(false);
-    } catch (error) {
-      console.error("Error rendering page:", error);
-      setIsLoading(false);
+    if (pdfDocumentRef.current) {
+      renderPage(currentPage);
+      onUpdateProgress(book.id, currentPage);
     }
+  }, [currentPage, zoom]);
+
+  const goToPrevPage = () => {
+    setCurrentPage((prev) => Math.max(1, prev - 1));
   };
 
-  const goToPage = (pageNumber: number) => {
-    if (pageNumber >= 1 && pageNumber <= totalPages) {
-      setCurrentPage(pageNumber);
-    }
+  const goToNextPage = () => {
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
   };
 
-  const handlePageChange = (newValue: number[]) => {
-    goToPage(newValue[0]);
-  };
-
-  const handleBookmarkToggle = () => {
-    setIsBookmarked(!isBookmarked);
+  const toggleBookmark = () => {
+    setIsBookmarked((prev) => !prev);
     onBookmarkToggle(book.id);
   };
 
-  // Early return if no PDF data
-  if (!pdfData) {
-    return (
-      <div className="flex flex-col h-full items-center justify-center">
-        <div className="text-center p-8">
-          <h3 className="text-lg font-medium mb-2">Unable to load PDF</h3>
-          <p className="text-muted-foreground mb-4">The PDF file could not be loaded correctly.</p>
-          <Button onClick={onClose}>Return to Library</Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col h-full">
-      {/* Reader header */}
-      <div className="flex items-center justify-between border-b p-4">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={onClose}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h2 className="font-serif font-medium truncate max-w-md">
-            {book.title}
-          </h2>
-        </div>
-        
-        <div className="flex items-center gap-2">
+    <div className="w-full h-full flex flex-col bg-background text-foreground">
+      <div className="flex justify-between items-center p-4 border-b">
+        <Button variant="ghost" onClick={onClose}>
+          <ArrowLeft className="w-5 h-5 mr-2" />
+          Back
+        </Button>
+        <div className="flex items-center space-x-4">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleBookmarkToggle}
-                >
+                <Button variant="ghost" onClick={goToPrevPage} disabled={currentPage === 1}>
+                  <ChevronLeft />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Previous Page</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" onClick={goToNextPage} disabled={currentPage === totalPages}>
+                  <ChevronRight />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Next Page</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" onClick={() => setZoom((z) => Math.min(z + 0.1, 3))}>
+                  <ZoomIn />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Zoom In</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" onClick={() => setZoom((z) => Math.max(z - 0.1, 0.5))}>
+                  <ZoomOut />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Zoom Out</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" onClick={toggleBookmark}>
                   <BookmarkIcon
-                    className={`h-4 w-4 ${isBookmarked ? "text-primary fill-primary" : ""}`}
+                    className={isBookmarked ? "fill-primary text-primary" : ""}
                   />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                {isBookmarked ? "Remove bookmark" : "Add bookmark"}
+                {isBookmarked ? "Remove Bookmark" : "Add Bookmark"}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
-              disabled={zoom <= 0.5}
-            >
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <span className="text-xs w-12 text-center">
-              {Math.round(zoom * 100)}%
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setZoom(Math.min(3, zoom + 0.1))}
-              disabled={zoom >= 3}
-            >
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
       </div>
 
-      {/* Reader content */}
-      <div className="flex-1 overflow-auto flex flex-col items-center justify-center relative p-6 bg-gray-50 dark:bg-gray-900 sepia:bg-sepia-50">
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-            <Progress value={30} className="w-24 animate-pulse" />
-          </div>
+      <div className="flex-1 flex items-center justify-center overflow-auto bg-muted p-4">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading PDF...</p>
+        ) : (
+          <canvas ref={canvasRef} />
         )}
-        <div 
-          className={`page-turn transition-transform shadow-lg rounded bg-white dark:bg-gray-800 sepia:bg-sepia-200 ${
-            isLoading ? "opacity-50" : "opacity-100"
-          }`}
-          style={{
-            transformOrigin: 'center left',
-          }}
-        >
-          <canvas 
-            ref={canvasRef} 
-            className="max-h-[calc(100vh-200px)] rounded page-turn-content"
-          />
-        </div>
       </div>
 
-      {/* Reader footer */}
-      <div className="border-t p-4">
-        <div className="flex items-center justify-between mb-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage <= 1}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          
-          <div className="flex-1 mx-4">
-            <Slider
-              value={[currentPage]}
-              min={1}
-              max={totalPages}
-              step={1}
-              onValueChange={handlePageChange}
-              className="w-full"
-            />
-          </div>
-          
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage >= totalPages}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+      <div className="p-4 space-y-2">
+        <Slider
+          min={1}
+          max={totalPages}
+          value={[currentPage]}
+          onValueChange={(val) => setCurrentPage(val[0])}
+        />
+        <div className="flex justify-between text-sm text-muted-foreground">
+          <span>
+            Page {currentPage} of {totalPages}
+          </span>
+          <span>{Math.round((currentPage / totalPages) * 100)}% read</span>
         </div>
-        
-        <div className="text-center text-sm text-muted-foreground">
-          Page {currentPage} of {totalPages}
-        </div>
+        <Progress value={(currentPage / totalPages) * 100} />
       </div>
     </div>
   );
